@@ -1,7 +1,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-require('dotenv').config();
-const twilio = require('twilio');
+
+// Load .env only in development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 const responses = require('./responses');
 const normalizeInput = require('./utils');
@@ -10,105 +13,99 @@ const app = express();
 
 // Environment variables
 const PORT = process.env.PORT || 3000;
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '';
 
-// Initialize Twilio client
-const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-
-// Middleware (Twilio sends form-urlencoded)
+// Middleware - Parse Twilio's application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 // Health check
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ===============================
-// Twilio SMS Webhook
-// ===============================
-app.post('/webhook/sms', async (req, res) => {
-  const from = req.body.From;
-  const to = req.body.To;
-  const body = req.body.Body || '';
-  const messageSid = req.body.MessageSid;
-
-  const userInput = normalizeInput(body);
-
-  console.log('------------------------------');
-  console.log('--- Incoming SMS ---');
-  console.log(`Timestamp: ${new Date().toISOString()}`);
-  console.log(`From: ${from}`);
-  console.log(`To: ${to}`);
-  console.log(`Original Message: ${body}`);
-  console.log(`Normalized Input: ${userInput}`);
-  console.log(`MessageSid: ${messageSid}`);
-  console.log('------------------------------');
-
-  if (!userInput) {
-    return res.status(200).send('OK');
-  }
-
-  // Command routing (STRICT & SAFE)
-  let responseMessage;
-
-  switch (userInput) {
-    case 'hi':
-    case 'hello':
-      responseMessage = responses.welcomeMessage;
-      break;
-
-    case 'service':
-      responseMessage = responses.serviceInfo;
-      break;
-
-    case 'prayer':
-      responseMessage = responses.prayerRequest;
-      break;
-
-    case 'jesus':
-      responseMessage = responses.aboutJesus;
-      break;
-
-    case 'help':
-      responseMessage = responses.helpMessage;
-      break;
-
-    case 'pastor':
-      responseMessage = responses.pastorMessage;
-      break;
-
-    case 'stop':
-    case 'unsubscribe':
-      responseMessage = responses.unsubscribeMessage;
-      break;
-
-    default:
-      responseMessage = responses.fallbackMessage;
-  }
-
-  console.log(`Response Selected: ${responseMessage}`);
-
-  // ===============================
-  // SEND SMS USING TWILIO REST API
-  // ===============================
+// Twilio SMS Webhook Handler
+app.post('/webhook/sms', (req, res) => {
   try {
-    const message = await client.messages.create({
-      body: responseMessage,
-      from: TWILIO_PHONE_NUMBER,
-      to: from
-    });
+    // Extract Twilio parameters
+    const from = req.body.From || '';
+    const to = req.body.To || '';
+    const body = req.body.Body || '';
+    const messageSid = req.body.MessageSid || '';
 
-    console.log(`SMS sent successfully: ${message.sid}`);
-    res.status(200).send('OK');
+    // Normalize input (lowercase, trimmed)
+    const userInput = normalizeInput(body);
+
+    // Log incoming message
+    console.log('--- Incoming SMS ---');
+    console.log(`Timestamp: ${new Date().toISOString()}`);
+    console.log(`From: ${from}`);
+    console.log(`To: ${to}`);
+    console.log(`Message: ${body}`);
+    console.log(`Normalized: ${userInput}`);
+    console.log(`MessageSid: ${messageSid}`);
+
+    // Handle empty messages safely
+    if (!userInput) {
+      console.log('Empty message received');
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responses.fallbackMessage}</Message>
+</Response>`;
+      return res.type('text/xml').status(200).send(twiml);
+    }
+
+    // Command routing - Exact string matching only
+    let responseMessage;
+
+    switch (userInput) {
+      case 'hi':
+      case 'hello':
+        responseMessage = responses.welcomeMessage;
+        break;
+      case 'service':
+        responseMessage = responses.serviceInfo;
+        break;
+      case 'prayer':
+        responseMessage = responses.prayerRequest;
+        break;
+      case 'jesus':
+        responseMessage = responses.aboutJesus;
+        break;
+      case 'help':
+        responseMessage = responses.helpMessage;
+        break;
+      case 'pastor':
+        responseMessage = responses.pastorMessage;
+        break;
+      case 'stop':
+      case 'unsubscribe':
+        responseMessage = responses.unsubscribeMessage;
+        break;
+      default:
+        // Unknown command - safe fallback
+        responseMessage = responses.fallbackMessage;
+    }
+
+    console.log(`Response: ${responseMessage}`);
+
+    // Return TwiML response
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responseMessage}</Message>
+</Response>`;
+
+    res.type('text/xml').status(200).send(twiml);
   } catch (error) {
-    console.error('Failed to send SMS:', error);
-    res.status(500).send('SMS send failed');
+    // Never crash - always return valid TwiML
+    console.error('Error processing webhook:', error);
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responses.fallbackMessage}</Message>
+</Response>`;
+    res.type('text/xml').status(200).send(errorTwiml);
   }
 });
 

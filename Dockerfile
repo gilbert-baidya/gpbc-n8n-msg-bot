@@ -11,8 +11,8 @@ RUN npm ci --only=production
 # Copy application code
 COPY src ./src
 
-# Expose port
-EXPOSE 3000
+# Expose port (Railway will override with PORT env var)
+EXPOSE 8080
 
 # Set NODE_ENV
 ENV NODE_ENV=production
