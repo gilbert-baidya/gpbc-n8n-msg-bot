@@ -3,7 +3,7 @@
 
 # Node modules
 node_modules/
-package-lock.json
+
 
 # n8n data
 n8n_data/
