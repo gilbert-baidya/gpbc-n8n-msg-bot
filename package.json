@@ -1,0 +1,33 @@
+{
+  "name": "church-n8n-chatbot",
+  "version": "1.0.0",
+  "description": "n8n + Twilio SMS chatbot for church communications",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "logs": "docker-compose logs -f",
+    "restart": "docker-compose restart",
+    "clean": "docker-compose down -v",
+    "dev": "node src/server.js",
+    "dev:watch": "nodemon src/server.js"
+  },
+  "keywords": [
+    "n8n",
+    "twilio",
+    "sms",
+    "chatbot",
+    "webhook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "twilio": "^5.11.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

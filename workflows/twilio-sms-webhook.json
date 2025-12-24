@@ -1,0 +1,78 @@
+{
+  "name": "Twilio SMS Webhook Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-sms",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "twilio-sms"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "from",
+              "value": "={{$json[\"body\"][\"From\"]}}"
+            },
+            {
+              "name": "message",
+              "value": "={{$json[\"body\"][\"Body\"]}}"
+            },
+            {
+              "name": "to",
+              "value": "={{$json[\"body\"][\"To\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract SMS Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "content": "Thank you for your message! We'll get back to you soon.",
+        "respondWith": "text",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract SMS Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SMS Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
